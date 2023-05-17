@@ -4,114 +4,116 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+
+#define ARGC_MAX 10
+
+//handler for ctrlC
+void ctrlCHandler(int signal) {
+        printf("Ctrl + c detected. Please use exit instead.");
+}
 
 int main(int argc, char **argv) {
+        //register the ignore ctrl+c handler
+        signal(SIGINT, ctrlCHandler);
 
         //initialize char pointerpointer for use with execv - needs to end with NULL
-        char *args[2];
-
-        args[1] = NULL;
-
+        char *args[ARGC_MAX+2];
         int ret;
         int pid = -1;
 
         do {
+                //get current working directory and print result + ">"
+                char cwd[1024];
+                if(getcwd(cwd, sizeof(cwd)) != NULL) {
+                        printf("%s> ", cwd);
+                } else {
+                        perror("getcwd");
+                        exit(EXIT_FAILURE);
+                }
+
+                //make input possible
+                char input[100];
+                fgets(input, 100, stdin);
+
+                if(input[0] == '\n') {
+                        continue;
+                }
+
+                //replace \n with \0 for later use as single strings
+                input[strcspn(input, "\n")] = '\0';
+
+                // - transfer parameters -
+
+                //to determin parameters
+                char *delimiter = " ";
+
+                //initialize and set correct program name
+                char *ptr = strtok(input, delimiter);
+
+                //tests -----------------------------------------
+                //printf("ptr 0 = %s", ptr);
+                //-----------------------------------------------
+
+                //set correct parameters
+                int i = 0;
+                while(ptr != NULL && i < ARGC_MAX) {
+                        args[i] = ptr;
+
+                        //troubleshooting------------------------
+                        //printf("ptr aktuell: %s \n", ptr);
+                        //---------------------------------------
+
+                        ptr = strtok(NULL, delimiter);
+                        i++;
+                }
+
+                //set last element NULL
+                args[i] = NULL;
+
+                //test ------------------------------------------
+                //printf("args[0] = %s", args[0]);
+                //printf("args[1] = %s", args[1]);
+                //-----------------------------------------------
+
+                //check for cd instead of normal input
+                if(strcmp(args[0], "cd") == 0) {
+                        if(i > 0) {
+                                if(chdir(args[1]) == -1) {
+                                        perror("cdinput");
+                                }
+                        } else {
+                                fprintf(stderr, "No Argument for cd was found!");
+                        }
+
+                        continue;
+                }
+
+                //Check for exit instead of normal input
+                if(strcmp(args[0], "exit") == 0) {
+                        exit(EXIT_SUCCESS);
+                }
+
+                //neuer Prozess für Programmaufruf
                 pid = fork();
 
-                //Errorhandling
+                //Fehlerbehandlung
                 if(pid == -1) {
                         exit(EXIT_FAILURE);
                 }
 
                 //child
                 if(pid == 0) {
-                        //standard output + >
-
-                        //full path for program
-                        args[0] = "/bin/pwd";
-                        args[1] = NULL;
-                        execv(args[0], args);
+                        //start correct program with correct parameters
+                        execvp(args[0], args);
                         exit(EXIT_SUCCESS);
                 }
 
                 //parent
                 else {
                         wait(&ret);
-                        printf("> ");
-
-                        //make input possible
-                        char input[100];
-
-                        fgets(input, 100, stdin);
-                        printf("Test eingabe: %s", input);
-
-                        //new array for execv
-                        char *args2[10];
-                        char help[] = "/bin/";
-
-                        // - transfer parameters -
-
-                        //to determin parameters
-                        char *delimiter = " ";
-                        char *ptr;
-
-                        //initialize and set correct program name
-                        ptr = strtok(input, delimiter);
-
-                        printf("ptr 0 = %s", ptr);
-                        strcat(help, ptr);
-                        printf("help = %s", help);
-                        args2[0] = help;
-                        printf("args2[0] = %s", args2[0]);
-
-                        printf("ptr 0 = %s", ptr);
-                        printf("args2[0] = %s", args2[0]);
-
-                        //set correct parameters
-                        int i = 1;
-                        /*while(ptr != NULL && i < 10) {
-                                args2[i] = ptr;
-
-                                //troubleshooting
-                                printf("ptr aktuell: %s \n", ptr);
-
-                                ptr = strtok(NULL, delimiter);
-                                i++;
-                        }*/
-
-                        //set last element NULL
-                        args2[i] = NULL;
-
-                        printf("args2[0] = %s", args2[0]);
-                        printf("args2[1] = %s", args2[1]);
-                        //neuer Prozess für Programmaufruf
-
-                        int pid2 = fork();
-
-                        //Fehlerbehandlung
-                        if(pid2 == -1) {
-                                exit(EXIT_FAILURE);
-                        }
-
-                        //child
-                        if(pid2 == 0) {
-
-                                //start correct program with correct parameters
-                                execvp(args2[0], args2);
-
-                                exit(EXIT_SUCCESS);
-
-                        }
-
-
-                        //parent
-
-                        else {
-
-                                wait(&ret);
-                        }
-
                 }
-        } while(1);
 
+        } while(1);
+        return 0;
 }
