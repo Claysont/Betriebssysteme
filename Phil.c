@@ -19,6 +19,9 @@ void test_forks_available(int id) {
         status[id] = EATING;
         sem_post(&phil[id]);
     }
+    else if (status[LEFT] == STARVING || status[RIGHT] == STARVING) {
+            printf("Philosopher %d fasted a little longer in favor of a fellow student.\n", id);
+    }
 }
 
 void prevent_starvation(int id) {
@@ -38,27 +41,26 @@ void grab(int id) {
 void drop(int id) {
     sem_wait(&mutex);
     status[id] = THINKING;
-    printf("Philosopher %d is done eating. And waited %d to do so.\n", id, time() - timeWaited[id]);
-    timeWaited[id] = time();
+    printf("Philosopher %d is done eating. And waited %ld seconds to do so.\n", id, time(NULL) - timeWaited[id]);
+    timeWaited[id] = time(NULL);
     test_forks_available(LEFT);
     test_forks_available(RIGHT);
     prevent_starvation(LEFT);
     prevent_starvation(RIGHT);
     sem_post(&mutex);
-
 }
 
 void *philosopher(void *arg) {
     int id = *((int *)arg);
 
-    timeWaited[id] = time();
+    timeWaited[id] = time(NULL);
 
     while (1) {
         printf("Philosopher %d is thinking.\n", id);
-        sleep(1);
+        sleep(rand() % 4);
         grab(id);
         printf("Philosopher %d is eating.\n", id);
-        sleep(1);
+        sleep(rand() % 4);
         drop(id);
     }
 }
@@ -89,3 +91,4 @@ int main() {
     }
 
     return 0;
+}
